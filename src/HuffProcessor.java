@@ -1,3 +1,4 @@
+import java.util.PriorityQueue;
 
 /**
  * Although this class has a history of several years, it is starting from a
@@ -38,14 +39,125 @@ public class HuffProcessor {
 	 * @param out Buffered bit stream writing to the output file.
 	 */
 	public void compress(BitInputStream in, BitOutputStream out) {
-
-		while (true) {
-			int val = in.readBits(BITS_PER_WORD);
-			if (val == -1)
-				break;
-			out.writeBits(BITS_PER_WORD, val);
-		}
+		// get character frequencies
+		int[] counts = readForCounts(in);
+		
+		// create the Huffman trie
+		HuffNode root = makeTreeFromCounts(counts);
+		
+		//  create encodings for each eight-bit character chunk
+		String[] codings = makeCodingsFromTree(root);
+		
+		
+		out.writeBits(BITS_PER_INT, HUFF_TREE);
+		writeHeader(root,out);
+		
+		in.reset();
+		writeCompressedBits(codings, in, out);
 		out.close();
+	}
+
+	/**
+	 * Determine the frequency of every eight-bit character/chunk in the file being compressed
+	 * @param in	the file being compressed
+	 * @return		an array of frequencies where the index of the array represents the value
+	 * and the value at that index represents how often that value occurs
+	 */
+	private int[] readForCounts(BitInputStream in) {
+		int[] counts = new int[ALPH_SIZE + 1];
+		
+		while (true) {
+			int value = in.readBits(BITS_PER_WORD);
+			if (value == -1) break;
+			counts[value] = counts[value]+1;
+			
+		}
+		counts[PSEUDO_EOF] = 1;
+		return counts;
+	}
+	
+	/**
+	 * Uses a greedy algorithm and a priority queue of HuffNode objects to create the Huffman trie
+	 * from the frequencies of every eight-bit character chunk used to create encodings for each character.
+	 * @param counts	the frequencies of each character chunk
+	 * @return	the root node of the HUffman trie
+	 */
+	private HuffNode makeTreeFromCounts(int[] counts) {
+
+		PriorityQueue<HuffNode> pq = new PriorityQueue<>();
+		
+		// for every index such that freq[index] > 0, make a node and add to the queue
+		for(int index = 0; index < counts.length; index++) {
+			if(counts[index] > 0)
+			pq.add(new HuffNode(index,counts[index],null,null));
+		}
+
+		// remove the minimal-weight nodes and combine them
+		while (pq.size() > 1) {
+			HuffNode left = pq.remove();
+    		HuffNode right = pq.remove();
+    		pq.add(new HuffNode(0, left.myWeight+right.myWeight, left, right));
+		}
+		
+		// root is the root node of our Huffman trie
+		HuffNode root = pq.remove();
+		return root;
+	}
+
+	/**
+	 * Use the Huffman trie to create the encodings for each eight-bit character chunk
+	 * @param root	the root HuffNode of the Huffman trie
+	 * @return an array of Strings such that array[val] is the encoding of the 8-bit chunk val
+	 */
+	private String[] makeCodingsFromTree(HuffNode root) {
+		String[] encodings = new String[ALPH_SIZE + 1];
+	    codingHelper(root,"",encodings);
+
+		return encodings;
+	}
+	
+	/**
+	 * Recursive helper method to create encodings for each character using the Huffman trie
+	 * 
+	 * @param root		HuffNode that's the root of a subtree
+	 * @param string	the path to root as a string of zeros and ones
+	 * @param encodings	the array of encodings
+	 */
+	private void codingHelper(HuffNode root, String path, String[] encodings) {
+		// this should never happen, but just in case
+		if (root == null)
+			return;
+
+		// if root is a leaf, add the encoding
+		if (root.myLeft == null && root.myRight == null) {
+			encodings[root.myValue] = path;
+			return;
+		}
+
+		// otherwise, keep going
+		codingHelper(root.myLeft, path + "0", encodings);
+		codingHelper(root.myRight, path + "1", encodings);
+	}
+
+	/**
+	 * 
+	 * @param root
+	 * @param out
+	 */
+	private void writeHeader(HuffNode root, BitOutputStream out) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	/**
+	 * 
+	 * @param codings
+	 * @param in
+	 * @param out
+	 */
+	private void writeCompressedBits(String[] codings, BitInputStream in, BitOutputStream out) {
+		// TODO Auto-generated method stub
+		
 	}
 
 	/**
