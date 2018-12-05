@@ -25,7 +25,7 @@ public class HuffProcessor {
 	public static final int DEBUG_LOW = 1;
 
 	public HuffProcessor() {
-		this(0);
+		this(4);
 	}
 
 	public HuffProcessor(int debug) {
@@ -50,6 +50,10 @@ public class HuffProcessor {
 		
 		
 		out.writeBits(BITS_PER_INT, HUFF_TREE);
+		// debug printing
+		if (myDebugLevel >= DEBUG_HIGH) {
+			System.out.printf("Wrote magic number %d \n", HUFF_TREE);
+		}
 		writeHeader(root,out);
 		
 		in.reset();
@@ -73,6 +77,14 @@ public class HuffProcessor {
 			
 		}
 		counts[PSEUDO_EOF] = 1;
+		
+		// debug printing
+		if(myDebugLevel >= DEBUG_HIGH) {
+			for(int i = 0; i < counts.length; i++)
+			System.out.println(counts[i]);
+			System.out.println("EOF: " + counts[PSEUDO_EOF]);
+		}
+		
 		return counts;
 	}
 	
@@ -91,6 +103,11 @@ public class HuffProcessor {
 			if(counts[index] > 0)
 			pq.add(new HuffNode(index,counts[index],null,null));
 		}
+		
+		// debug printing
+		if (myDebugLevel >= DEBUG_HIGH) {
+			System.out.printf("pq ceated with %d nodes \n", pq.size());
+		}
 
 		// remove the minimal-weight nodes and combine them
 		while (pq.size() > 1) {
@@ -101,6 +118,7 @@ public class HuffProcessor {
 		
 		// root is the root node of our Huffman trie
 		HuffNode root = pq.remove();
+		
 		return root;
 	}
 
@@ -112,16 +130,17 @@ public class HuffProcessor {
 	private String[] makeCodingsFromTree(HuffNode root) {
 		String[] encodings = new String[ALPH_SIZE + 1];
 	    codingHelper(root,"",encodings);
-
+	    
 		return encodings;
 	}
 	
 	/**
-	 * Recursive helper method to create encodings for each character using the Huffman trie
+	 * Recursive helper method to create encodings for each character using the
+	 * Huffman trie
 	 * 
-	 * @param root		HuffNode that's the root of a subtree
-	 * @param string	the path to root as a string of zeros and ones
-	 * @param encodings	the array of encodings
+	 * @param root      HuffNode that's the root of a subtree
+	 * @param string    the path to root as a string of zeros and ones
+	 * @param encodings the array of encodings
 	 */
 	private void codingHelper(HuffNode root, String path, String[] encodings) {
 		// this should never happen, but just in case
@@ -131,6 +150,11 @@ public class HuffProcessor {
 		// if root is a leaf, add the encoding
 		if (root.myLeft == null && root.myRight == null) {
 			encodings[root.myValue] = path;
+
+			// debug printing
+			if (myDebugLevel >= DEBUG_HIGH) {
+				System.out.printf("encoding for %d is %s\n", root.myValue, path);
+			}
 			return;
 		}
 
@@ -140,24 +164,55 @@ public class HuffProcessor {
 	}
 
 	/**
+	 * Writes a pre-order traversal of the Huffman trie. Internal nodes are written
+	 * as zero, leaf nodes are written as 1 followed by 9 bits of the value stored
+	 * in the leaf
 	 * 
-	 * @param root
-	 * @param out
+	 * @param root the HuffNode of the trie that we are on
+	 * @param out  the pre-order traversal of the trie
 	 */
 	private void writeHeader(HuffNode root, BitOutputStream out) {
-		// TODO Auto-generated method stub
-		
+		HuffNode current = root;
+
+		// leaf node
+		if (current.myLeft == null && current.myRight == null) {
+			out.writeBits(1, 1); // write a single bit of 1
+			out.writeBits(BITS_PER_WORD + 1, current.myValue);
+
+			// debug printing
+			if (myDebugLevel >= DEBUG_HIGH) {
+				System.out.printf("Wrote leaf for %d \n",current.myValue);
+			}
+		}
+		// not a leaf
+		else {
+			out.writeBits(1, 0); // write a single bit of 0
+			writeHeader(current.myLeft, out);
+			writeHeader(current.myRight, out);
+		}
 	}
 	
 	/**
-	 * 
-	 * @param codings
-	 * @param in
-	 * @param out
+	 * Read file to be compressed and process one character at a time
+	 * @param codings	a mapping of characters to encodings such that array[c] is the encoding of the 8-bit chunk c
+	 * @param in	the file to be compressed
+	 * @param out	where to write the compresed file
 	 */
 	private void writeCompressedBits(String[] codings, BitInputStream in, BitOutputStream out) {
-		// TODO Auto-generated method stub
 		
+		while (true) {
+			int val = in.readBits(BITS_PER_WORD);
+			if (val == -1) {
+				String code = codings[PSEUDO_EOF];
+				out.writeBits(code.length(), Integer.parseInt(code,2));
+				break;
+			}
+			else {
+				String code = codings[val];
+				out.writeBits(code.length(), Integer.parseInt(code,2));
+			}
+		}	
+
 	}
 
 	/**
