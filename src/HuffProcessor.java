@@ -81,7 +81,7 @@ public class HuffProcessor {
 		// debug printing
 		if(myDebugLevel >= DEBUG_HIGH) {
 			for(int i = 0; i < counts.length; i++)
-			System.out.println(counts[i]);
+			if(counts[i] != 0) System.out.println(counts[i]);
 			System.out.println("EOF: " + counts[PSEUDO_EOF]);
 		}
 		
