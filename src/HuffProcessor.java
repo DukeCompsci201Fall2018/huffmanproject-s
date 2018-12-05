@@ -25,7 +25,7 @@ public class HuffProcessor {
 	public static final int DEBUG_LOW = 1;
 
 	public HuffProcessor() {
-		this(4);
+		this(0);
 	}
 
 	public HuffProcessor(int debug) {
